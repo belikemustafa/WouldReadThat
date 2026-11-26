@@ -1,5 +1,5 @@
 /* ==========================================================================
-   WOULD READ THAT — Open Library API Client, AND/OR Book Queries & Sorter
+   WOULD READ THAT — Fast, Throttled Open Library API Client & Book Sorter
    ========================================================================== */
 
 window.WRT_API = (() => {
@@ -7,11 +7,11 @@ window.WRT_API = (() => {
   const memCache = new Map();
   const docIndex = new Map();
 
-  const SEARCH_FIELDS = [
+  // Keep list queries lean (avoid huge isbn/publisher/subject/ia arrays that bloat Open Library Solr responses)
+  const LIST_FIELDS = [
     'key',
     'title',
     'author_name',
-    'author_key',
     'first_publish_year',
     'cover_i',
     'edition_count',
@@ -19,16 +19,42 @@ window.WRT_API = (() => {
     'ratings_average',
     'ratings_count',
     'readinglog_count',
-    'want_to_read_count',
-    'already_read_count',
-    'subject',
-    'publisher',
-    'language',
-    'first_sentence',
-    'ia',
     'ebook_access',
-    'isbn'
+    'first_sentence',
+    'language'
   ].join(',');
+
+  const DETAIL_SEARCH_FIELDS = `${LIST_FIELDS},publisher,isbn,ia`;
+
+  /* ---------- Concurrency-Limited Queue (Prevents Open Library 429 Bursts) ---------- */
+  const MAX_CONCURRENT = 3;
+  let activeRequests = 0;
+  const requestQueue = [];
+
+  function enqueueRequest(fn) {
+    return new Promise((resolve, reject) => {
+      requestQueue.push({ fn, resolve, reject });
+      drainQueue();
+    });
+  }
+
+  function drainQueue() {
+    while (activeRequests < MAX_CONCURRENT && requestQueue.length > 0) {
+      const next = requestQueue.shift();
+      activeRequests += 1;
+      next
+        .fn()
+        .then(next.resolve, next.reject)
+        .finally(() => {
+          activeRequests -= 1;
+          drainQueue();
+        });
+    }
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 
   function getGeminiKey() {
     return localStorage.getItem(CFG.STORAGE_KEYS.GEMINI_KEY)?.trim() || '';
@@ -86,24 +112,24 @@ window.WRT_API = (() => {
   }
 
   function buildCoverUrl(coverId, size = 'M') {
-    if (!coverId) return '';
+    if (!coverId || Number(coverId) <= 0) return '';
     return `${CFG.COVERS_BASE}${coverId}-${size}.jpg?default=false`;
   }
 
   function matchKnownAward(title) {
     const clean = String(title || '').toLowerCase().replace(/[’']/g, "'").trim();
-    if (CFG.KNOWN_AWARDS[clean]) return CFG.KNOWN_AWARDS[clean];
-    return '';
+    return CFG.KNOWN_AWARDS[clean] || '';
   }
 
   function enrichBookDoc(doc, overrides = {}) {
     const workId = extractWorkId(doc.key || overrides.workId);
-    const title = doc.title || overrides.title || 'Untitled';
-    const authors = Array.isArray(doc.author_name) && doc.author_name.length
-      ? doc.author_name
-      : overrides.author
-      ? [overrides.author]
-      : ['Unknown Author'];
+    const title = String(doc.title || overrides.title || 'Untitled').trim();
+    const authors =
+      Array.isArray(doc.author_name) && doc.author_name.length
+        ? doc.author_name
+        : overrides.author
+        ? [overrides.author]
+        : ['Unknown Author'];
     const authorDisplay = authors.slice(0, 2).join(', ');
     const yearNum = Number(doc.first_publish_year || overrides.first_publish_year || 0);
     const displayYear = yearNum > 0 ? String(yearNum) : '—';
@@ -117,40 +143,37 @@ window.WRT_API = (() => {
     const popularityScore = readinglogCount * 2 + ratingsCount * 10 + editionCount;
 
     const awardBadge =
+      matchKnownAward(title) ||
       overrides.awardBadge ||
       doc.awardBadge ||
-      matchKnownAward(title) ||
       '';
 
     const verifiedCache = readCache(`verify_book_${workId}`);
     let goodreadsScore = verifiedCache?.goodreads ?? null;
     let storygraphScore = verifiedCache?.storygraph ?? null;
 
-    const hasSignal = rawAvg > 0 && (ratingsCount >= 2 || readinglogCount >= 10);
-    if (hasSignal) {
+    // Calibrate from Open Library ratings whenever at least 1 rating exists
+    if (rawAvg > 0 && (ratingsCount >= 1 || readinglogCount >= 5)) {
+      const effectiveCount = Math.max(1, ratingsCount);
       if (goodreadsScore === null) {
-        const m = 18;
+        const m = 15;
         const prior = 3.92;
-        const smoothed = (ratingsCount / (ratingsCount + m)) * rawAvg + (m / (ratingsCount + m)) * prior;
+        const smoothed = (effectiveCount / (effectiveCount + m)) * rawAvg + (m / (effectiveCount + m)) * prior;
         const prestigeNudge = awardBadge ? 0.08 : 0;
         goodreadsScore = Number(Math.min(4.85, Math.max(2.2, smoothed + prestigeNudge)).toFixed(2));
       }
 
       if (storygraphScore === null) {
-        const subjectsLower = (doc.subject || []).slice(0, 20).map((s) => String(s).toLowerCase());
-        const literarySignal =
-          (awardBadge ? 0.12 : 0) +
-          (subjectsLower.some((s) => s.includes('literary') || s.includes('philosophy') || s.includes('classic')) ? 0.06 : 0) -
-          (ratingsCount < 10 ? 0.05 : 0);
-        const sgBase = (goodreadsScore || rawAvg) - 0.04 + literarySignal;
+        const prestigeLift = awardBadge ? 0.1 : 0;
+        const sgBase = (goodreadsScore || rawAvg) - 0.04 + prestigeLift;
         storygraphScore = Number(Math.min(4.85, Math.max(2.1, sgBase)).toFixed(2));
       }
     }
 
     const firstSentence = extractText(doc.first_sentence);
-    const subjects = (doc.subject || []).slice(0, 12);
-    const publishers = (doc.publisher || []).slice(0, 8);
-    const languages = (doc.language || []).slice(0, 6);
+    const subjects = Array.isArray(doc.subject) ? doc.subject.slice(0, 12) : [];
+    const publishers = Array.isArray(doc.publisher) ? doc.publisher.slice(0, 8) : [];
+    const languages = Array.isArray(doc.language) ? doc.language.slice(0, 6) : [];
     const isbn = Array.isArray(doc.isbn) && doc.isbn.length ? doc.isbn[0] : '';
     const iaId = Array.isArray(doc.ia) && doc.ia.length ? doc.ia[0] : '';
 
@@ -160,7 +183,6 @@ window.WRT_API = (() => {
       displayTitle: title,
       authors,
       authorDisplay,
-      authorKeys: doc.author_key || [],
       yearNum,
       displayYear,
       pages,
@@ -191,8 +213,26 @@ window.WRT_API = (() => {
     return enriched;
   }
 
-  /* ---------- Universal Sorter (Excludes Unrated on Rating Sorts) ---------- */
-  function sortAndSanitize(items, sortMode) {
+  // Deduplicate works with identical title + primary author, keeping the cover-bearing / most popular record
+  function dedupeBooks(books) {
+    const byKey = new Map();
+    for (const b of books) {
+      if (!b || !b.id) continue;
+      const sig = `${b.displayTitle.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}::${(b.authors[0] || '').toLowerCase().trim()}`;
+      const existing = byKey.get(sig);
+      if (!existing) {
+        byKey.set(sig, b);
+      } else {
+        const bScore = (b.coverId ? 100000 : 0) + b.popularityScore;
+        const eScore = (existing.coverId ? 100000 : 0) + existing.popularityScore;
+        if (bScore > eScore) byKey.set(sig, b);
+      }
+    }
+    return [...byKey.values()];
+  }
+
+  /* ---------- Universal Sorter ---------- */
+  function sortAndSanitize(items, sortMode, preserveOrderOnDefault = false) {
     let list = [...items];
 
     if (sortMode === 'goodreads.desc' || sortMode === 'goodreads.asc') {
@@ -237,10 +277,11 @@ window.WRT_API = (() => {
       return list.sort((a, b) => a.displayTitle.localeCompare(b.displayTitle));
     }
 
+    if (preserveOrderOnDefault) return list;
     return list.sort((a, b) => (b.popularityScore || 0) - (a.popularityScore || 0));
   }
 
-  /* ---------- Open Library Fetch Helper ---------- */
+  /* ---------- Resilient Open Library Fetch with Retry & Timeout ---------- */
   async function olFetch(path, params = {}, skipCache = false) {
     const url = new URL(`${CFG.OPEN_LIBRARY_BASE}${path}`);
     Object.entries(params).forEach(([k, v]) => {
@@ -253,70 +294,84 @@ window.WRT_API = (() => {
       if (cached) return cached;
     }
 
-    const res = await fetch(url.toString());
-    if (!res.ok) throw new Error(`Open Library Error ${res.status}`);
-    const data = await res.json();
-    writeCache(cacheKey, data);
-    return data;
+    return enqueueRequest(async () => {
+      let lastErr = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 14000);
+        try {
+          const res = await fetch(url.toString(), { signal: controller.signal });
+          clearTimeout(timer);
+          if (res.status === 429 || res.status >= 500) {
+            lastErr = new Error(`Open Library Error ${res.status}`);
+            await sleep(500 * (attempt + 1));
+            continue;
+          }
+          if (!res.ok) throw new Error(`Open Library Error ${res.status}`);
+          const data = await res.json();
+          writeCache(cacheKey, data);
+          return data;
+        } catch (err) {
+          clearTimeout(timer);
+          lastErr = err;
+          if (attempt < 2) await sleep(450 * (attempt + 1));
+        }
+      }
+      throw lastErr || new Error('Open Library request failed');
+    });
   }
 
-  async function resolveCuratedEntries(entries) {
-    const settled = await Promise.allSettled(
-      entries.map(async (entry) => {
-        const data = await olFetch('/search.json', {
-          title: entry.title,
-          author: entry.author,
-          limit: 3,
-          fields: SEARCH_FIELDS
-        });
-        const docs = data.docs || [];
-        const best = docs.find((d) => d.cover_i) || docs[0];
-        if (!best) return null;
-        return enrichBookDoc(best, {
-          author: entry.author,
-          awardBadge: entry.award || '',
-          blurb: entry.blurb || ''
-        });
-      })
-    );
-
-    const seen = new Set();
-    return settled
-      .filter((r) => r.status === 'fulfilled' && r.value && r.value.id)
-      .map((r) => r.value)
-      .filter((b) => {
-        if (seen.has(b.id)) return false;
-        seen.add(b.id);
-        return true;
-      });
-  }
-
+  /* ---------- Home Spotlight & Collections (1 Fast Request Each) ---------- */
   async function fetchHeroSpotlight() {
-    return resolveCuratedEntries(CFG.HERO_CURATED);
+    let data = await olFetch('/search.json', {
+      ...CFG.HERO_QUERY,
+      lang: 'en',
+      fields: LIST_FIELDS
+    });
+
+    let docs = (data.docs || []).filter((d) => d.key && d.title);
+    if (!docs.length) {
+      data = await olFetch('/search.json', {
+        q: 'subject:fiction',
+        sort: 'readinglog',
+        limit: 12,
+        lang: 'en',
+        fields: LIST_FIELDS
+      });
+      docs = (data.docs || []).filter((d) => d.key && d.title);
+    }
+
+    const enriched = dedupeBooks(docs.map((d) => enrichBookDoc(d)));
+    const withCovers = enriched.filter((b) => b.coverId);
+    return (withCovers.length >= 4 ? withCovers : enriched).slice(0, 6);
   }
 
   async function fetchCollection(collection) {
-    if (collection.type === 'curated') {
-      const pool = CFG.PRESTIGE_POOLS[collection.poolKey] || [];
-      return resolveCuratedEntries(pool);
-    }
     const data = await olFetch('/search.json', {
       ...collection.params,
-      fields: SEARCH_FIELDS
+      lang: 'en',
+      fields: LIST_FIELDS
     });
-    return (data.docs || [])
-      .filter((d) => d.key && d.title)
-      .map((d) => enrichBookDoc(d));
+    const docs = (data.docs || []).filter((d) => d.key && d.title);
+    const enriched = dedupeBooks(
+      docs.map((d) => enrichBookDoc(d, { awardBadge: collection.awardHint || '' }))
+    );
+    // Float books with cover scans to the front of each shelf
+    return enriched.sort((a, b) => Number(Boolean(b.coverId)) - Number(Boolean(a.coverId))).slice(0, 14);
   }
 
-  async function searchBooks(query, page = 1, limit = 20) {
+  /* ---------- Search & Author Autocomplete ---------- */
+  async function searchBooks(query, page = 1, limit = 24) {
     const clean = query.trim();
-    const isIsbn = /^(97[89])?\d{9}[\dXx]$/.test(clean.replace(/[-\s]/g, ''));
+    const compactIsbn = clean.replace(/[-\s]/g, '');
+    const isIsbn = /^(97[89])?\d{9}[\dXx]$/.test(compactIsbn);
     const params = isIsbn
-      ? { isbn: clean.replace(/[-\s]/g, ''), page, limit, fields: SEARCH_FIELDS }
-      : { q: clean, page, limit, fields: SEARCH_FIELDS };
+      ? { isbn: compactIsbn, page, limit, lang: 'en', fields: LIST_FIELDS }
+      : { q: clean, page, limit, lang: 'en', fields: LIST_FIELDS };
+
     const data = await olFetch('/search.json', params);
-    const results = (data.docs || []).filter((d) => d.key && d.title).map((d) => enrichBookDoc(d));
+    const rawDocs = (data.docs || []).filter((d) => d.key && d.title);
+    const results = dedupeBooks(rawDocs.map((d) => enrichBookDoc(d)));
     const totalFound = Number(data.numFound || results.length);
     return {
       results,
@@ -337,58 +392,57 @@ window.WRT_API = (() => {
     }));
   }
 
+  /* ---------- Book Dossier Details ---------- */
   async function fetchBookDetails(workId) {
     const cleanId = extractWorkId(workId);
     const cachedDoc = docIndex.get(cleanId) || null;
 
-    const [workRes, ratingsRes] = await Promise.allSettled([
+    const tasks = [
       olFetch(`/works/${encodeURIComponent(cleanId)}.json`),
       olFetch(`/works/${encodeURIComponent(cleanId)}/ratings.json`)
-    ]);
-
-    const work = workRes.status === 'fulfilled' ? workRes.value : {};
-    const ratingsSummary = ratingsRes.status === 'fulfilled' ? ratingsRes.value?.summary : null;
-
-    // If we didn't have search doc metadata (e.g. opened from saved shelf), enrich via search
-    let baseDoc = cachedDoc;
-    if (!baseDoc) {
-      try {
-        const s = await olFetch('/search.json', {
+    ];
+    // Fetch publisher/ISBN/IA info on-demand for this single work if missing from list cache
+    if (!cachedDoc || (!cachedDoc.publishers?.length && !cachedDoc.isbn)) {
+      tasks.push(
+        olFetch('/search.json', {
           q: `key:"/works/${cleanId}"`,
           limit: 1,
-          fields: SEARCH_FIELDS
-        });
-        if (s.docs?.[0]) {
-          baseDoc = enrichBookDoc(s.docs[0]);
-        }
-      } catch {
-        // fall through to work payload
-      }
+          lang: 'en',
+          fields: DETAIL_SEARCH_FIELDS
+        })
+      );
     }
+
+    const [workRes, ratingsRes, searchRes] = await Promise.allSettled(tasks);
+    const work = workRes.status === 'fulfilled' ? workRes.value : {};
+    const ratingsSummary = ratingsRes.status === 'fulfilled' ? ratingsRes.value?.summary : null;
+    const extraDoc = searchRes?.status === 'fulfilled' ? searchRes.value?.docs?.[0] || null : null;
 
     const mergedRaw = {
       key: `/works/${cleanId}`,
-      title: work.title || baseDoc?.displayTitle || 'Untitled',
-      author_name: baseDoc?.authors,
-      author_key: baseDoc?.authorKeys,
-      first_publish_year: baseDoc?.yearNum || parseYearFromStr(work.first_publish_date),
-      cover_i: baseDoc?.coverId || (Array.isArray(work.covers) ? work.covers.find((c) => c > 0) : null),
-      number_of_pages_median: baseDoc?.pages,
-      ratings_average: ratingsSummary?.average || baseDoc?.goodreadsScore || 0,
-      ratings_count: ratingsSummary?.count || baseDoc?.ratingsCount || 0,
-      readinglog_count: baseDoc?.readinglogCount || 0,
-      edition_count: baseDoc?.editionCount || 0,
-      subject: work.subjects || baseDoc?.subjects || [],
-      publisher: baseDoc?.publishers || [],
-      language: baseDoc?.languages || [],
-      first_sentence: work.first_sentence || baseDoc?.firstSentence || '',
-      ia: baseDoc?.iaId ? [baseDoc.iaId] : [],
-      ebook_access: baseDoc?.ebookAccess || '',
-      isbn: baseDoc?.isbn ? [baseDoc.isbn] : []
+      title: work.title || extraDoc?.title || cachedDoc?.displayTitle || 'Untitled',
+      author_name: extraDoc?.author_name || cachedDoc?.authors,
+      first_publish_year: extraDoc?.first_publish_year || cachedDoc?.yearNum || parseYearFromStr(work.first_publish_date),
+      cover_i:
+        extraDoc?.cover_i ||
+        cachedDoc?.coverId ||
+        (Array.isArray(work.covers) ? work.covers.find((c) => c > 0) : null),
+      number_of_pages_median: extraDoc?.number_of_pages_median || cachedDoc?.pages,
+      ratings_average: ratingsSummary?.average || extraDoc?.ratings_average || cachedDoc?.goodreadsScore || 0,
+      ratings_count: ratingsSummary?.count || extraDoc?.ratings_count || cachedDoc?.ratingsCount || 0,
+      readinglog_count: extraDoc?.readinglog_count || cachedDoc?.readinglogCount || 0,
+      edition_count: extraDoc?.edition_count || cachedDoc?.editionCount || 0,
+      subject: work.subjects || cachedDoc?.subjects || [],
+      publisher: extraDoc?.publisher || cachedDoc?.publishers || [],
+      language: extraDoc?.language || cachedDoc?.languages || [],
+      first_sentence: work.first_sentence || extraDoc?.first_sentence || cachedDoc?.firstSentence || '',
+      ia: extraDoc?.ia || (cachedDoc?.iaId ? [cachedDoc.iaId] : []),
+      ebook_access: extraDoc?.ebook_access || cachedDoc?.ebookAccess || '',
+      isbn: extraDoc?.isbn || (cachedDoc?.isbn ? [cachedDoc.isbn] : [])
     };
 
     const enriched = enrichBookDoc(mergedRaw, {
-      awardBadge: baseDoc?.awardBadge || ''
+      awardBadge: cachedDoc?.awardBadge || ''
     });
 
     const description = extractText(work.description);
@@ -403,7 +457,7 @@ window.WRT_API = (() => {
 
     return {
       ...enriched,
-      description: description || baseDoc?.blurb || '',
+      description: description || cachedDoc?.blurb || '',
       excerpts,
       firstSentence: extractText(work.first_sentence) || enriched.firstSentence || '',
       subjectPlaces: (work.subject_places || []).slice(0, 6),
@@ -417,35 +471,37 @@ window.WRT_API = (() => {
     return m ? Number(m[1]) : 0;
   }
 
-  /* ---------- Filter Studio Discovery with Native AND / OR Queries ---------- */
+  /* ---------- Filter Studio Discovery with Clean Lucene Queries ---------- */
   function quoteTerm(str) {
-    return `"${String(str).replace(/"/g, '').trim()}"`;
+    const cleaned = String(str || '')
+      .replace(/[’‘]/g, "'")
+      .replace(/["\\]/g, '')
+      .trim();
+    return `"${cleaned}"`;
   }
 
-  function joinFieldClause(field, values, logic) {
-    if (!values.length) return '';
+  function joinClauses(parts, logic) {
+    const valid = parts.filter(Boolean);
+    if (!valid.length) return '';
     const op = logic === 'OR' ? ' OR ' : ' AND ';
-    const parts = values.map((v) => `${field}:${quoteTerm(v)}`);
-    return parts.length > 1 ? `(${parts.join(op)})` : parts[0];
+    return valid.length > 1 ? `(${valid.join(op)})` : valid[0];
   }
 
   async function discoverWithFilters(filters, page = 1) {
-    // 1. Curated Literary Prize Pools
-    if (filters.awards && filters.awards !== 'all') {
-      if (page > 1) return { results: [], total_pages: 1, total_results: 0 };
-      const pool = CFG.PRESTIGE_POOLS[filters.awards] || [];
-      let items = await resolveCuratedEntries(pool);
-      items = applyLocalFilters(items, filters);
-      items = sortAndSanitize(items, filters.sort);
-      return { results: items, total_pages: 1, total_results: items.length };
-    }
-
-    // 2. Build Open Library Lucene query from all active filters
     const clauses = [];
 
+    const hasExplicitSubjects =
+      filters.genres.length > 0 ||
+      filters.authors.length > 0 ||
+      filters.themes.length > 0 ||
+      filters.publishers.length > 0 ||
+      (filters.awards && filters.awards !== 'all');
+
+    // Only apply default `fiction` format when no other primary facet was chosen,
+    // or whenever the user explicitly switched to non-fiction / classics / poetry / graphic novels.
     const fmtCfg = CFG.FORMATS[filters.format];
-    if (fmtCfg?.subject) {
-      clauses.push(`subject:${quoteTerm(fmtCfg.subject)}`);
+    if (fmtCfg?.query && (filters.format !== 'fiction' || !hasExplicitSubjects)) {
+      clauses.push(fmtCfg.query);
     }
 
     if (filters.language) {
@@ -453,41 +509,43 @@ window.WRT_API = (() => {
     }
 
     if (filters.genres.length) {
-      clauses.push(joinFieldClause('subject', filters.genres, filters.genreLogic));
+      const genreParts = filters.genres.map((id) => {
+        const g = CFG.GENRES.find((item) => item.id === id);
+        return g?.query || `subject:${quoteTerm(id)}`;
+      });
+      clauses.push(joinClauses(genreParts, filters.genreLogic));
     }
 
     if (filters.authors.length) {
-      clauses.push(
-        joinFieldClause(
-          'author',
-          filters.authors.map((a) => a.name),
-          filters.authorLogic
-        )
-      );
+      const authorParts = filters.authors.map((a) => `author:${quoteTerm(a.name)}`);
+      clauses.push(joinClauses(authorParts, filters.authorLogic));
     }
 
     if (filters.themes.length) {
-      const themeQueries = filters.themes.map((id) => {
+      const themeParts = filters.themes.map((id) => {
         const found = CFG.THEMES_MOODS.find((t) => t.id === id);
-        return found ? found.query : id;
+        return `subject:${quoteTerm(found ? found.query : id)}`;
       });
-      clauses.push(joinFieldClause('subject', themeQueries, filters.themeLogic));
+      clauses.push(joinClauses(themeParts, filters.themeLogic));
     }
 
     if (filters.publishers.length) {
-      clauses.push(
-        joinFieldClause(
-          'publisher',
-          filters.publishers.map((p) => p.id || p.name),
-          filters.publisherLogic
-        )
-      );
+      const pubParts = filters.publishers.map((p) => `publisher:${quoteTerm(p.id || p.name)}`);
+      clauses.push(joinClauses(pubParts, filters.publisherLogic));
+    }
+
+    const awardCfg = CFG.AWARDS_PRESETS.find((a) => a.id === filters.awards);
+    if (awardCfg?.query) {
+      clauses.push(awardCfg.query);
     }
 
     if (filters.yearFrom || filters.yearTo) {
       const from = filters.yearFrom || '*';
       const to = filters.yearTo || '*';
       clauses.push(`first_publish_year:[${from} TO ${to}]`);
+    } else if (filters.sort === 'year.desc') {
+      // Exclude malformed future-dated catalog entries on Newest sort
+      clauses.push(`first_publish_year:[1900 TO ${new Date().getFullYear()}]`);
     }
 
     if (filters.maxPages && filters.maxPages < 900) {
@@ -495,21 +553,30 @@ window.WRT_API = (() => {
     }
 
     if (filters.availability.length) {
-      const accessClauses = filters.availability.map((mode) => {
+      const accessParts = filters.availability.map((mode) => {
         if (mode === 'public') return 'ebook_access:public';
         if (mode === 'borrowable') return 'ebook_access:borrowable';
         return 'has_fulltext:true';
       });
-      clauses.push(accessClauses.length > 1 ? `(${accessClauses.join(' OR ')})` : accessClauses[0]);
+      clauses.push(joinClauses(accessParts, 'OR'));
     }
 
-    const q = clauses.length ? clauses.join(' AND ') : 'subject:"fiction"';
-    const limit = 24;
-    const params = { q, page, limit, fields: SEARCH_FIELDS };
+    const q = clauses.length ? clauses.join(' AND ') : 'subject:fiction';
+    const limit = 28;
+    const langCfg = CFG.LANGUAGES.find((l) => l.code === filters.language);
+    const params = {
+      q,
+      page,
+      limit,
+      lang: langCfg?.iso1 || 'en',
+      fields: LIST_FIELDS
+    };
 
-    // Map UI sort to Open Library server sort
+    // Map UI sort to valid Open Library Solr sorts
     if (filters.sort === 'goodreads.desc' || filters.sort === 'storygraph.desc') {
       params.sort = 'rating';
+    } else if (filters.sort === 'goodreads.asc' || filters.sort === 'storygraph.asc') {
+      params.sort = 'rating asc';
     } else if (filters.sort === 'year.desc') {
       params.sort = 'new';
     } else if (filters.sort === 'year.asc') {
@@ -521,7 +588,12 @@ window.WRT_API = (() => {
     }
 
     const data = await olFetch('/search.json', params);
-    let results = (data.docs || []).filter((d) => d.key && d.title).map((d) => enrichBookDoc(d));
+    let results = dedupeBooks(
+      (data.docs || [])
+        .filter((d) => d.key && d.title)
+        .map((d) => enrichBookDoc(d, { awardBadge: awardCfg?.badge || '' }))
+    );
+
     results = applyLocalFilters(results, filters);
     results = sortAndSanitize(results, filters.sort);
 
@@ -540,15 +612,6 @@ window.WRT_API = (() => {
       if (filters.yearFrom && book.yearNum && book.yearNum < Number(filters.yearFrom)) return false;
       if (filters.yearTo && book.yearNum && book.yearNum > Number(filters.yearTo)) return false;
       if (filters.maxPages && filters.maxPages < 900 && book.pages && book.pages > Number(filters.maxPages)) return false;
-      if (filters.language && book.languages.length && !book.languages.includes(filters.language)) return false;
-      if (filters.authors.length) {
-        const lowerAuthors = book.authors.map((a) => a.toLowerCase());
-        const ok =
-          filters.authorLogic === 'OR'
-            ? filters.authors.some((a) => lowerAuthors.some((la) => la.includes(a.name.toLowerCase())))
-            : filters.authors.every((a) => lowerAuthors.some((la) => la.includes(a.name.toLowerCase())));
-        if (!ok) return false;
-      }
       return true;
     });
   }
@@ -590,19 +653,21 @@ window.WRT_API = (() => {
   }
 
   async function aiNaturalLanguageDiscover(userPrompt) {
-    const prompt = `You are a literary archivist and bookseller. Using Google Search to verify facts, return a JSON array of up to 10 exact book recommendations matching: "${userPrompt}".
+    const prompt = `You are a literary archivist and bookseller. Using Google Search to verify facts, return a JSON array of up to 8 exact book recommendations matching: "${userPrompt}".
 Return ONLY valid JSON with objects containing: {"title": string, "author": string, "reason": string}.`;
 
     const recs = await geminiGroundedJson(prompt, `ai_books_${userPrompt.toLowerCase()}`);
     if (!Array.isArray(recs) || !recs.length) return null;
 
     const settled = await Promise.allSettled(
-      recs.slice(0, 10).map(async (rec) => {
+      recs.slice(0, 8).map(async (rec) => {
         const data = await olFetch('/search.json', {
           title: rec.title,
           author: rec.author,
-          limit: 2,
-          fields: SEARCH_FIELDS
+          sort: 'readinglog',
+          limit: 3,
+          lang: 'en',
+          fields: LIST_FIELDS
         });
         const match = (data.docs || []).find((d) => d.cover_i) || (data.docs || [])[0];
         if (!match) return null;
@@ -610,7 +675,7 @@ Return ONLY valid JSON with objects containing: {"title": string, "author": stri
       })
     );
 
-    return settled.filter((r) => r.status === 'fulfilled' && r.value).map((r) => r.value);
+    return dedupeBooks(settled.filter((r) => r.status === 'fulfilled' && r.value).map((r) => r.value));
   }
 
   async function verifyBookPrestige(workId, title, author) {

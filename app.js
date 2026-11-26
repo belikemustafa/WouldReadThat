@@ -18,6 +18,7 @@
     discoverPage: 1,
     discoverTotalPages: 1,
     discoverMode: 'filter',
+    discoverSeq: 0,
     currentResults: [],
     lastQuery: '',
     shelfFilter: 'all',
@@ -104,7 +105,7 @@
   }
 
   /* ---------- View Switching ---------- */
-  function switchView(viewName) {
+  function switchView(viewName, { skipAutoDiscover = false } = {}) {
     state.view = viewName;
     closeAllPopovers();
     document.querySelectorAll('.view-section').forEach((el) => el.classList.remove('active'));
@@ -112,7 +113,7 @@
     document.querySelectorAll('.dock-btn').forEach((b) => b.classList.toggle('active', b.dataset.mobileNav === viewName));
     $(`${viewName}View`)?.classList.add('active');
 
-    if (viewName === 'discover' && !state.currentResults.length) {
+    if (viewName === 'discover' && !skipAutoDiscover && !state.currentResults.length) {
       runDiscover(1, false);
     }
     if (viewName === 'shelf') renderShelfView();
@@ -470,7 +471,10 @@
       });
     }
 
-    const displayList = API.sortAndSanitize(state.currentResults, state.filters.sort);
+    const preserveOrder =
+      (state.discoverMode === 'search' || state.discoverMode === 'ai') &&
+      state.filters.sort === 'popularity.desc';
+    const displayList = API.sortAndSanitize(state.currentResults, state.filters.sort, preserveOrder);
     const ratedNote = isRatingSort ? ' · unrated books hidden' : '';
     $('resultsMeta').textContent = `${metaPrefix}${displayList.length} book${displayList.length === 1 ? '' : 's'}${ratedNote}`;
 
@@ -485,51 +489,72 @@
 
   async function runDiscover(page = 1, append = false) {
     closeAllPopovers();
+    const seq = ++state.discoverSeq;
     state.discoverMode = 'filter';
     state.discoverPage = page;
-    if (!append) $('discoverGrid').innerHTML = createSkeletonCards(8);
+    if (!append) {
+      $('discoverGrid').innerHTML = createSkeletonCards(8);
+      $('resultsMeta').textContent = 'Querying literary archive…';
+    }
 
     try {
       const data = await API.discoverWithFilters(state.filters, page);
+      if (seq !== state.discoverSeq) return;
       state.discoverTotalPages = data.total_pages;
       renderDiscoverGrid(data.results, append, 'Showing ');
       $('paginationBar').classList.toggle('hidden', page >= state.discoverTotalPages);
     } catch (err) {
+      if (seq !== state.discoverSeq) return;
       $('discoverGrid').innerHTML = `<div class="empty-state">Unable to load books (${escapeHtml(err.message)}).</div>`;
     }
   }
 
-  async function runConciergeSearch(query, useAI = false) {
+  async function runConciergeSearch(query, useAI = false, page = 1, append = false) {
     const clean = query.trim();
     if (!clean) return;
 
-    switchView('discover');
-    state.lastQuery = clean;
-    $('paginationBar').classList.add('hidden');
+    const seq = ++state.discoverSeq;
+    if (!append) {
+      switchView('discover', { skipAutoDiscover: true });
+      syncSorterUI('popularity.desc');
+      state.lastQuery = clean;
+      state.discoverPage = 1;
+      $('paginationBar').classList.add('hidden');
+    } else {
+      state.discoverPage = page;
+    }
 
     if (useAI && !API.getGeminiKey()) {
       showToast('Add a Gemini API Key in Settings for AI Discover. Searching Open Library.');
       useAI = false;
     }
 
-    $('discoverGrid').innerHTML = createSkeletonCards(8);
-    $('resultsMeta').textContent = useAI ? '✦ Consulting Gemini Literary Grounding…' : `Searching “${clean}”…`;
+    if (!append) {
+      $('discoverGrid').innerHTML = createSkeletonCards(8);
+      $('resultsMeta').textContent = useAI ? '✦ Consulting Gemini Literary Grounding…' : `Searching “${clean}”…`;
+    }
 
     try {
       let results = [];
+      let totalPages = 1;
       let prefix = `Search “${clean}” — `;
-      if (useAI) {
+      if (useAI && !append) {
         state.discoverMode = 'ai';
         results = (await API.aiNaturalLanguageDiscover(clean)) || [];
         prefix = `✦ AI Grounded “${clean}” — `;
       }
       if (!useAI || !results.length) {
         state.discoverMode = 'search';
-        const data = await API.searchBooks(clean, 1);
+        const data = await API.searchBooks(clean, page);
         results = data.results;
+        totalPages = data.total_pages;
       }
-      renderDiscoverGrid(results, false, prefix);
+      if (seq !== state.discoverSeq) return;
+      state.discoverTotalPages = totalPages;
+      renderDiscoverGrid(results, append, prefix);
+      $('paginationBar').classList.toggle('hidden', state.discoverMode !== 'search' || page >= totalPages);
     } catch (err) {
+      if (seq !== state.discoverSeq) return;
       $('discoverGrid').innerHTML = `<div class="empty-state">Search failed: ${escapeHtml(err.message)}</div>`;
     }
   }
@@ -557,7 +582,10 @@
   function attachCoverFallbacks(rootEl) {
     if (!rootEl) return;
     rootEl.querySelectorAll('img[data-fallback-title]').forEach((img) => {
+      let swapped = false;
       const swap = () => {
+        if (swapped || !img.parentNode) return;
+        swapped = true;
         const wrapper = document.createElement('div');
         wrapper.innerHTML = buildCoverPlaceholderHTML(
           img.dataset.fallbackTitle,
@@ -567,7 +595,14 @@
         img.replaceWith(wrapper.firstElementChild);
       };
       img.addEventListener('error', swap, { once: true });
-      if (img.complete && img.naturalWidth === 0) swap();
+      img.addEventListener(
+        'load',
+        () => {
+          if (img.naturalWidth <= 2 || img.naturalHeight <= 2) swap();
+        },
+        { once: true }
+      );
+      if (img.complete && (img.naturalWidth <= 2 || img.naturalHeight <= 2)) swap();
     });
   }
 
@@ -1383,7 +1418,13 @@
     $('sortSelect').addEventListener('change', (e) => handleSortChange(e.target.value));
 
     $('applyFiltersBtn').addEventListener('click', () => runDiscover(1, false));
-    $('loadMoreBtn').addEventListener('click', () => runDiscover(state.discoverPage + 1, true));
+    $('loadMoreBtn').addEventListener('click', () => {
+      if (state.discoverMode === 'search' && state.lastQuery) {
+        runConciergeSearch(state.lastQuery, false, state.discoverPage + 1, true);
+      } else {
+        runDiscover(state.discoverPage + 1, true);
+      }
+    });
 
     $('resetAllFiltersBtn').addEventListener('click', () => {
       const currentSort = state.filters.sort;
