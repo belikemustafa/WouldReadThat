@@ -1,5 +1,5 @@
 /* ==========================================================================
-   WOULD READ THAT — Configuration, Curated Literary Pools & Filter Presets
+   WOULD READ THAT — Configuration, Curated Literary Queries & Filter Presets
    Powered by Open Library (No API Key Required) + Optional Gemini Grounding
    ========================================================================== */
 
@@ -16,7 +16,7 @@ window.WRT_CONFIG = {
     USERS: 'wrt_users_v1',
     ACTIVE_USER: 'wrt_active_user_v1',
     SHELF_PREFIX: 'wrt_shelf_',
-    CACHE_PREFIX: 'wrt_cache_v1_'
+    CACHE_PREFIX: 'wrt_cache_v2_'
   },
 
   // 3 Refined Dark Surfaces
@@ -36,46 +36,49 @@ window.WRT_CONFIG = {
   ],
 
   FORMATS: {
-    fiction: { label: 'Fiction', subject: 'fiction' },
-    nonfiction: { label: 'Non-Fiction', subject: 'nonfiction' },
-    classics: { label: 'Classics', subject: 'classics' },
-    poetry: { label: 'Poetry & Essays', subject: 'poetry' },
-    graphic: { label: 'Graphic Novels', subject: 'graphic novels' }
+    fiction: { label: 'Fiction', query: 'subject:fiction' },
+    nonfiction: {
+      label: 'Non-Fiction',
+      query: '(subject:history OR subject:biography OR subject:philosophy OR subject:science OR subject:psychology)'
+    },
+    classics: { label: 'Classics', query: 'subject:classics' },
+    poetry: { label: 'Poetry & Essays', query: '(subject:poetry OR subject:essays)' },
+    graphic: { label: 'Graphic Novels', query: '(subject:"graphic novels" OR subject:comics)' }
   },
 
   GENRES: [
-    { id: 'literary fiction', name: 'Literary Fiction' },
-    { id: 'science fiction', name: 'Sci-Fi' },
-    { id: 'fantasy', name: 'Fantasy' },
-    { id: 'mystery', name: 'Mystery' },
-    { id: 'thriller', name: 'Thriller' },
-    { id: 'historical fiction', name: 'Historical Fiction' },
-    { id: 'philosophy', name: 'Philosophy' },
-    { id: 'biography', name: 'Biography & Memoir' },
-    { id: 'history', name: 'History' },
-    { id: 'psychology', name: 'Psychology' },
-    { id: 'horror', name: 'Horror & Gothic' },
-    { id: 'romance', name: 'Romance' },
-    { id: 'crime', name: 'Crime & Noir' },
-    { id: 'dystopia', name: 'Dystopian' },
-    { id: 'science', name: 'Popular Science' }
+    { id: 'literary fiction', name: 'Literary Fiction', query: 'subject:"literary fiction"' },
+    { id: 'science fiction', name: 'Sci-Fi', query: 'subject:"science fiction"' },
+    { id: 'fantasy', name: 'Fantasy', query: 'subject:fantasy' },
+    { id: 'mystery', name: 'Mystery', query: 'subject:mystery' },
+    { id: 'thriller', name: 'Thriller', query: 'subject:thriller' },
+    { id: 'historical fiction', name: 'Historical Fiction', query: 'subject:"historical fiction"' },
+    { id: 'philosophy', name: 'Philosophy', query: 'subject:philosophy' },
+    { id: 'biography', name: 'Biography & Memoir', query: '(subject:biography OR subject:memoir)' },
+    { id: 'history', name: 'History', query: 'subject:history' },
+    { id: 'psychology', name: 'Psychology', query: 'subject:psychology' },
+    { id: 'horror', name: 'Horror & Gothic', query: '(subject:horror OR subject:gothic)' },
+    { id: 'romance', name: 'Romance', query: 'subject:romance' },
+    { id: 'crime', name: 'Crime & Noir', query: '(subject:crime OR subject:"detective and mystery stories")' },
+    { id: 'dystopia', name: 'Dystopian', query: 'subject:dystopia' },
+    { id: 'science', name: 'Popular Science', query: 'subject:science' }
   ],
 
-  // ISO 639-2 3-letter codes used by Open Library
+  // ISO 639-2 codes for Open Library `language:` filter + ISO 639-1 for `lang=` display preference
   LANGUAGES: [
-    { code: '', name: 'All Languages' },
-    { code: 'eng', name: 'English' },
-    { code: 'jpn', name: 'Japanese' },
-    { code: 'fre', name: 'French' },
-    { code: 'spa', name: 'Spanish' },
-    { code: 'ger', name: 'German' },
-    { code: 'rus', name: 'Russian' },
-    { code: 'ita', name: 'Italian' },
-    { code: 'kor', name: 'Korean' },
-    { code: 'hin', name: 'Hindi' },
-    { code: 'ara', name: 'Arabic' },
-    { code: 'por', name: 'Portuguese' },
-    { code: 'chi', name: 'Chinese' }
+    { code: '', iso1: 'en', name: 'All Languages' },
+    { code: 'eng', iso1: 'en', name: 'English' },
+    { code: 'jpn', iso1: 'ja', name: 'Japanese' },
+    { code: 'fre', iso1: 'fr', name: 'French' },
+    { code: 'spa', iso1: 'es', name: 'Spanish' },
+    { code: 'ger', iso1: 'de', name: 'German' },
+    { code: 'rus', iso1: 'ru', name: 'Russian' },
+    { code: 'ita', iso1: 'it', name: 'Italian' },
+    { code: 'kor', iso1: 'ko', name: 'Korean' },
+    { code: 'hin', iso1: 'hi', name: 'Hindi' },
+    { code: 'ara', iso1: 'ar', name: 'Arabic' },
+    { code: 'por', iso1: 'pt', name: 'Portuguese' },
+    { code: 'chi', iso1: 'zh', name: 'Chinese' }
   ],
 
   // Tap-to-select & tap-again-to-deselect Essential Authors
@@ -132,11 +135,11 @@ window.WRT_CONFIG = {
   ],
 
   AWARDS_PRESETS: [
-    { id: 'all', label: 'All Books' },
-    { id: 'booker', label: 'Booker Prize' },
-    { id: 'pulitzer', label: 'Pulitzer Fiction' },
-    { id: 'nobel', label: 'Nobel Laureates' },
-    { id: 'hugo', label: 'Hugo & Nebula' }
+    { id: 'all', label: 'All Books', query: '' },
+    { id: 'booker', label: 'Booker Prize', query: 'subject:"Booker Prize"', badge: 'Booker Prize Honoree' },
+    { id: 'pulitzer', label: 'Pulitzer Fiction', query: 'subject:"Pulitzer Prize"', badge: 'Pulitzer Prize Honoree' },
+    { id: 'nobel', label: 'Nobel Laureates', query: 'subject:"Nobel Prize"', badge: 'Nobel Literature' },
+    { id: 'hugo', label: 'Hugo & Nebula', query: '(subject:"Hugo Award" OR subject:"Nebula Award")', badge: 'Hugo / Nebula Honoree' }
   ],
 
   AVAILABILITY_OPTIONS: [
@@ -145,98 +148,7 @@ window.WRT_CONFIG = {
     { id: 'fulltext', label: 'Searchable Full Text' }
   ],
 
-  // Curated Literary Spotlight & Prize Pools (resolved dynamically via Open Library)
-  HERO_CURATED: [
-    {
-      title: 'Dune',
-      author: 'Frank Herbert',
-      award: 'Hugo Award · Nebula Award',
-      blurb: 'Set on the desert planet Arrakis, Paul Atreides navigates feudal treachery, ecology, and prophetic destiny in science fiction’s towering epic.'
-    },
-    {
-      title: 'The Remains of the Day',
-      author: 'Kazuo Ishiguro',
-      award: 'Booker Prize · Nobel Laureate',
-      blurb: 'On a motoring trip through postwar England, butler Stevens confronts a lifetime of devotion, restraint, and unspoken regret.'
-    },
-    {
-      title: 'One Hundred Years of Solitude',
-      author: 'Gabriel Garcia Marquez',
-      award: 'Nobel Prize in Literature',
-      blurb: 'Seven generations of the Buendía family rise and vanish in the mythic Colombian town of Macondo in the landmark of magical realism.'
-    },
-    {
-      title: 'The Secret History',
-      author: 'Donna Tartt',
-      award: 'Modern Dark Academia Classic',
-      blurb: 'At an elite New England college, a cloistered circle of Classics scholars crosses from aesthetic obsession into irreversible moral ruin.'
-    },
-    {
-      title: 'The Left Hand of Darkness',
-      author: 'Ursula K. Le Guin',
-      award: 'Hugo Award · Nebula Award',
-      blurb: 'An envoy journeys across the frozen world of Gethen, challenging every assumption of identity, loyalty, and human connection.'
-    },
-    {
-      title: 'Crime and Punishment',
-      author: 'Fyodor Dostoevsky',
-      award: 'Essential World Classic',
-      blurb: 'Through the fevered streets of St. Petersburg, Raskolnikov tests an extraordinary-man theory against the inescapable gravity of conscience.'
-    }
-  ],
-
-  PRESTIGE_POOLS: {
-    booker: [
-      { title: 'The Remains of the Day', author: 'Kazuo Ishiguro', award: 'Booker Prize Winner' },
-      { title: 'Wolf Hall', author: 'Hilary Mantel', award: 'Booker Prize Winner' },
-      { title: 'Midnight’s Children', author: 'Salman Rushdie', award: 'Booker of Bookers' },
-      { title: 'The God of Small Things', author: 'Arundhati Roy', award: 'Booker Prize Winner' },
-      { title: 'The Sense of an Ending', author: 'Julian Barnes', award: 'Booker Prize Winner' },
-      { title: 'Life of Pi', author: 'Yann Martel', award: 'Booker Prize Winner' },
-      { title: 'Disgrace', author: 'J. M. Coetzee', award: 'Booker Prize · Nobel Laureate' },
-      { title: 'Shuggie Bain', author: 'Douglas Stuart', award: 'Booker Prize Winner' },
-      { title: 'The White Tiger', author: 'Aravind Adiga', award: 'Booker Prize Winner' },
-      { title: 'Lincoln in the Bardo', author: 'George Saunders', award: 'Booker Prize Winner' }
-    ],
-    pulitzer: [
-      { title: 'Beloved', author: 'Toni Morrison', award: 'Pulitzer Prize · Nobel Laureate' },
-      { title: 'The Road', author: 'Cormac McCarthy', award: 'Pulitzer Prize for Fiction' },
-      { title: 'The Goldfinch', author: 'Donna Tartt', award: 'Pulitzer Prize for Fiction' },
-      { title: 'All the Light We Cannot See', author: 'Anthony Doerr', award: 'Pulitzer Prize for Fiction' },
-      { title: 'To Kill a Mockingbird', author: 'Harper Lee', award: 'Pulitzer Prize for Fiction' },
-      { title: 'The Overstory', author: 'Richard Powers', award: 'Pulitzer Prize for Fiction' },
-      { title: 'Middlesex', author: 'Jeffrey Eugenides', award: 'Pulitzer Prize for Fiction' },
-      { title: 'The Grapes of Wrath', author: 'John Steinbeck', award: 'Pulitzer Prize · Nobel Laureate' },
-      { title: 'The Underground Railroad', author: 'Colson Whitehead', award: 'Pulitzer Prize for Fiction' },
-      { title: 'Lonesome Dove', author: 'Larry McMurtry', award: 'Pulitzer Prize for Fiction' }
-    ],
-    nobel: [
-      { title: 'One Hundred Years of Solitude', author: 'Gabriel Garcia Marquez', award: 'Nobel Prize in Literature' },
-      { title: 'The Stranger', author: 'Albert Camus', award: 'Nobel Prize in Literature' },
-      { title: 'Never Let Me Go', author: 'Kazuo Ishiguro', award: 'Nobel Prize in Literature' },
-      { title: 'Beloved', author: 'Toni Morrison', award: 'Nobel Prize in Literature' },
-      { title: 'Siddhartha', author: 'Hermann Hesse', award: 'Nobel Prize in Literature' },
-      { title: 'The Old Man and the Sea', author: 'Ernest Hemingway', award: 'Nobel Prize · Pulitzer' },
-      { title: 'Drive Your Plow Over the Bones of the Dead', author: 'Olga Tokarczuk', award: 'Nobel Prize in Literature' },
-      { title: 'The Vegetarian', author: 'Han Kang', award: 'Nobel Prize · International Booker' },
-      { title: 'Blindness', author: 'Jose Saramago', award: 'Nobel Prize in Literature' },
-      { title: 'My Name Is Red', author: 'Orhan Pamuk', award: 'Nobel Prize in Literature' }
-    ],
-    hugo: [
-      { title: 'Dune', author: 'Frank Herbert', award: 'Hugo Award · Nebula Award' },
-      { title: 'The Left Hand of Darkness', author: 'Ursula K. Le Guin', award: 'Hugo Award · Nebula Award' },
-      { title: 'Neuromancer', author: 'William Gibson', award: 'Hugo · Nebula · Philip K. Dick' },
-      { title: 'Hyperion', author: 'Dan Simmons', award: 'Hugo Award Winner' },
-      { title: 'The Fifth Season', author: 'N. K. Jemisin', award: 'Hugo Award Winner' },
-      { title: 'The Three-Body Problem', author: 'Cixin Liu', award: 'Hugo Award Winner' },
-      { title: 'Foundation', author: 'Isaac Asimov', award: 'Hugo Award · Best All-Time Series' },
-      { title: 'Ender’s Game', author: 'Orson Scott Card', award: 'Hugo Award · Nebula Award' },
-      { title: 'Ancillary Justice', author: 'Ann Leckie', award: 'Hugo Award · Nebula Award' },
-      { title: 'The Dispossessed', author: 'Ursula K. Le Guin', award: 'Hugo Award · Nebula Award' }
-    ]
-  },
-
-  // Known prize map by lowercase title fragment for automatic laurel badges
+  // Known prize map by lowercase title for automatic laurel badges
   KNOWN_AWARDS: {
     'dune': 'Hugo Award · Nebula Award',
     'the remains of the day': 'Booker Prize · Nobel Laureate',
@@ -255,7 +167,7 @@ window.WRT_CONFIG = {
     'all the light we cannot see': 'Pulitzer Prize for Fiction',
     'the god of small things': 'Booker Prize Winner',
     'the vegetarian': 'Nobel Prize · International Booker',
-    'midnight\'s children': 'Booker of Bookers',
+    "midnight's children": 'Booker of Bookers',
     'the grapes of wrath': 'Pulitzer Prize · Nobel Laureate',
     'the old man and the sea': 'Pulitzer Prize · Nobel Laureate',
     'hyperion': 'Hugo Award Winner',
@@ -266,49 +178,64 @@ window.WRT_CONFIG = {
     'piranesi': 'Women’s Prize for Fiction'
   },
 
+  // Single-request Open Library queries for Home (fast, zero 429 bursts)
+  HERO_QUERY: {
+    q: 'subject:fiction',
+    sort: 'trending',
+    limit: 12
+  },
+
   COLLECTIONS: [
     {
       id: 'prestige',
       eyebrow: 'GOLD STANDARD',
       title: 'Prize-Winning Literature',
-      type: 'curated',
-      poolKey: 'booker'
+      awardHint: 'Literary Prize',
+      params: {
+        q: '(subject:"Pulitzer Prize" OR subject:"Booker Prize")',
+        sort: 'readinglog',
+        limit: 16
+      }
     },
     {
       id: 'literary_fiction',
       eyebrow: 'ESSENTIAL READING',
-      title: 'Acclaimed Modern & Classic Fiction',
-      type: 'search',
+      title: 'Most Read Fiction',
       params: {
-        q: 'subject:"literary fiction" language:eng',
+        q: 'subject:fiction',
         sort: 'readinglog',
-        limit: 14
+        limit: 16
       }
     },
     {
       id: 'speculative',
       eyebrow: 'WORLDS BEYOND',
-      title: 'Hugo & Nebula Sci-Fi Masterworks',
-      type: 'curated',
-      poolKey: 'hugo'
+      title: 'Sci-Fi & Speculative Masterworks',
+      params: {
+        q: 'subject:"science fiction"',
+        sort: 'readinglog',
+        limit: 16
+      }
     },
     {
       id: 'philosophy_nonfiction',
       eyebrow: 'IDEAS & INQUIRY',
-      title: 'Philosophy, History & Non-Fiction',
-      type: 'search',
+      title: 'Philosophy, History & Biography',
       params: {
-        q: '(subject:philosophy OR subject:history) language:eng',
+        q: '(subject:philosophy OR subject:history OR subject:biography)',
         sort: 'readinglog',
-        limit: 14
+        limit: 16
       }
     },
     {
       id: 'world_lit',
-      eyebrow: 'NOBEL & INTERNATIONAL',
-      title: 'Masterpieces of World Literature',
-      type: 'curated',
-      poolKey: 'nobel'
+      eyebrow: 'TIMELESS CANON',
+      title: 'Enduring World Classics',
+      params: {
+        q: 'subject:classics',
+        sort: 'editions',
+        limit: 16
+      }
     }
   ]
 };
