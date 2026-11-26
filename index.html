@@ -1,1 +1,673 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="abyssal-carbon" data-accent="royal-gold">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0c0f" />
+  <title>Would Read That — Curated Literary Archive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Ambient Literary Glow -->
+  <div class="ambient-vignette" aria-hidden="true"></div>
 
+  <!-- Top Editorial Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#home" class="brand-lockup" id="brandHomeBtn" aria-label="Would Read That Home">
+        <span class="brand-monogram" aria-hidden="true">
+          <svg viewBox="0 0 120 46" width="84" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2 H108 L118 12 V34 L108 44 H12 L2 34 V12 Z" stroke="currentColor" stroke-width="1.3" />
+            <path d="M15 6 H105 L113 14 V32 L105 40 H15 L7 32 V14 Z" stroke="currentColor" stroke-width="0.6" opacity="0.55" />
+            <polygon points="60,0 63,3 60,6 57,3" fill="currentColor" />
+            <polygon points="60,40 63,43 60,46 57,43" fill="currentColor" />
+            <text x="60" y="28.5" text-anchor="middle" fill="currentColor" font-family="Playfair Display, Georgia, serif" font-size="15.5" font-weight="600" letter-spacing="4">W·R·T</text>
+          </svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-title">WOULD READ THAT</span>
+          <span class="brand-subtitle">CURATED LITERARY ARCHIVE</span>
+        </span>
+      </a>
+
+      <!-- Desktop Navigation -->
+      <nav class="main-nav" aria-label="Primary Navigation">
+        <button class="nav-btn active" data-view="home">Home</button>
+        <button class="nav-btn" data-view="discover">Filter Studio</button>
+        <button class="nav-btn" data-view="shelf">
+          Reading Shelf <span class="badge-pill" id="shelfCountBadge">0</span>
+        </button>
+      </nav>
+
+      <div class="header-actions">
+        <button class="icon-btn" id="openSettingsBtn" title="Appearance & Settings" aria-label="Studio Settings">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+
+        <div class="auth-header-group" id="guestAuthButtons">
+          <button class="btn-ghost btn-sm" id="headerLoginBtn">Log In</button>
+          <button class="btn-accent btn-sm" id="headerSignupBtn">Sign Up</button>
+        </div>
+
+        <button class="member-pill hidden" id="memberProfileBtn" title="Member Account">
+          <span class="member-avatar" id="memberAvatarInitial">R</span>
+          <span id="memberHandleLabel">@reader</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Bottom Sheet Scrim -->
+  <div class="sheet-backdrop hidden" id="sheetBackdrop"></div>
+
+  <!-- Main Content -->
+  <main class="main-shell">
+    <!-- Literary Search Bar -->
+    <section class="search-bar-section">
+      <form id="conciergeSearchForm" class="concierge-form" autocomplete="off">
+        <div class="concierge-input-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            id="conciergeInput"
+            placeholder="Search a book, author, ISBN, or mood (e.g. 'philosophical sci-fi under 300 pages')…"
+          />
+          <button type="button" class="clear-search-btn hidden" id="clearSearchBtn" aria-label="Clear search">&times;</button>
+        </div>
+        <div class="concierge-actions">
+          <button type="submit" class="btn-accent">Search</button>
+          <button type="button" class="btn-outline" id="aiConciergeBtn" title="Gemini Search Grounding">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" />
+            </svg>
+            AI Discover
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ==================== VIEW: HOME ==================== -->
+    <div id="homeView" class="view-section active">
+      <section class="hero-spotlight" id="heroSpotlight" aria-label="Featured Literary Spotlight">
+        <svg class="deco-corner deco-tl" viewBox="0 0 40 40" width="30" height="30" fill="none" aria-hidden="true">
+          <path d="M2 38 V8 L8 2 H38 M8 38 V12 L12 8 H38" stroke="currentColor" stroke-width="1.1" />
+        </svg>
+        <svg class="deco-corner deco-tr" viewBox="0 0 40 40" width="30" height="30" fill="none" aria-hidden="true">
+          <path d="M38 38 V8 L32 2 H2 M32 38 V12 L28 8 H2" stroke="currentColor" stroke-width="1.1" />
+        </svg>
+
+        <div class="hero-track" id="heroTrack">
+          <div class="hero-skeleton shimmer">
+            <span>Curating Literary Spotlight…</span>
+          </div>
+        </div>
+
+        <div class="hero-controls">
+          <button class="hero-arrow" id="heroPrevBtn" aria-label="Previous Book">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
+          <div class="hero-dots" id="heroDots"></div>
+          <button class="hero-arrow" id="heroNextBtn" aria-label="Next Book">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+        <div class="hero-progress-track"><div class="hero-progress-bar" id="heroProgressBar"></div></div>
+      </section>
+
+      <!-- Ornamental Art Deco Book Divider -->
+      <div class="editorial-divider" aria-hidden="true">
+        <span class="divider-line"></span>
+        <svg viewBox="0 0 64 18" width="56" height="16" fill="none">
+          <path d="M32 3 C27 3 22 4.5 18 7 V15 C22 12.5 27 11.5 32 14 C37 11.5 42 12.5 46 15 V7 C42 4.5 37 3 32 3 Z" stroke="currentColor" stroke-width="1.1" />
+          <line x1="32" y1="3" x2="32" y2="14" stroke="currentColor" stroke-width="1" />
+          <circle cx="8" cy="9" r="1.5" fill="currentColor" opacity="0.65" />
+          <circle cx="56" cy="9" r="1.5" fill="currentColor" opacity="0.65" />
+        </svg>
+        <span class="divider-line"></span>
+      </div>
+
+      <!-- Curated Reading Shelves -->
+      <section class="collections-wrapper" id="collectionsContainer"></section>
+    </div>
+
+    <!-- ==================== VIEW: FILTER STUDIO ==================== -->
+    <div id="discoverView" class="view-section">
+      <div class="section-header-bar">
+        <div>
+          <p class="eyebrow">PRECISION LITERARY DISCOVERY</p>
+          <h1 class="editorial-heading">The Book Filter Studio</h1>
+        </div>
+        <div class="studio-toolbar">
+          <button class="btn-ghost btn-sm" id="resetAllFiltersBtn">Reset</button>
+          <button class="btn-accent btn-sm" id="applyFiltersBtn">Apply Filters</button>
+        </div>
+      </div>
+
+      <!-- Large Touch-Optimized Book Filter Triggers (10 Controls) -->
+      <div class="filter-bar-shell" id="filterBarShell">
+        <!-- 1. Category & Language -->
+        <div class="filter-popover" data-filter-box="format">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Form &amp; Lang</span>
+              <span class="ft-value" id="badge-format">Fiction · Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Literary Form &amp; Language</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="panel-section">
+              <div class="pill-group" id="formatPills">
+                <button type="button" class="chip active" data-format="fiction">Fiction</button>
+                <button type="button" class="chip" data-format="nonfiction">Non-Fiction</button>
+                <button type="button" class="chip" data-format="classics">Classics</button>
+                <button type="button" class="chip" data-format="poetry">Poetry &amp; Essays</button>
+                <button type="button" class="chip" data-format="graphic">Graphic Novels</button>
+              </div>
+            </div>
+            <label class="field-row">
+              <span>Language</span>
+              <select id="languageSelect"></select>
+            </label>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+
+        <!-- 2. Genre (with AND / OR) -->
+        <div class="filter-popover" data-filter-box="genre">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Genre</span>
+              <span class="ft-value" id="badge-genre">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel filter-panel-wide hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Genres</span>
+              <div class="logic-switch" data-logic-toggle="genre" role="group" aria-label="Genre match logic">
+                <button type="button" class="logic-btn active" data-logic-val="AND">AND</button>
+                <button type="button" class="logic-btn" data-logic-val="OR">OR</button>
+              </div>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <p class="helper-note" id="genreLogicHint">Matching books that span <strong>all</strong> selected genres.</p>
+            <div class="pill-group" id="genrePills"></div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+
+        <!-- 3. Goodreads Rating (SEPARATE) -->
+        <div class="filter-popover" data-filter-box="goodreads">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon ft-icon-gr" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><path d="M12 2.5l2.85 5.77 6.37.93-4.61 4.49 1.09 6.35L12 17.04l-5.7 3 1.09-6.35-4.61-4.49 6.37-.93L12 2.5z"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Goodreads</span>
+              <span class="ft-value" id="badge-goodreads">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Minimum Goodreads (/5★)</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="grPresets">
+              <button type="button" class="chip active" data-gr-preset="0">Any</button>
+              <button type="button" class="chip" data-gr-preset="3.6">3.6★+</button>
+              <button type="button" class="chip" data-gr-preset="3.8">3.8★+</button>
+              <button type="button" class="chip" data-gr-preset="4.0">4.0★+</button>
+              <button type="button" class="chip" data-gr-preset="4.2">4.2★+</button>
+              <button type="button" class="chip" data-gr-preset="4.4">4.4★+</button>
+            </div>
+            <label class="field-row">
+              <span>Fine-Tune: <strong id="minGrVal">Any</strong></span>
+              <input type="range" id="minGrRange" min="0" max="4.7" step="0.1" value="0" />
+            </label>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+
+        <!-- 4. StoryGraph Rating (SEPARATE) -->
+        <div class="filter-popover" data-filter-box="storygraph">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon ft-icon-sg" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="10" width="3.5" height="10" rx="1"/><rect x="10.2" y="5" width="3.5" height="15" rx="1"/><rect x="16.5" y="8" width="3.5" height="12" rx="1" transform="rotate(-10 18 14)"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">StoryGraph</span>
+              <span class="ft-value" id="badge-storygraph">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Minimum StoryGraph (/5★)</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="sgPresets">
+              <button type="button" class="chip active" data-sg-preset="0">Any</button>
+              <button type="button" class="chip" data-sg-preset="3.5">3.5★+</button>
+              <button type="button" class="chip" data-sg-preset="3.8">3.8★+</button>
+              <button type="button" class="chip" data-sg-preset="4.0">4.0★+</button>
+              <button type="button" class="chip" data-sg-preset="4.2">4.2★+</button>
+              <button type="button" class="chip" data-sg-preset="4.4">4.4★+</button>
+            </div>
+            <label class="field-row">
+              <span>Fine-Tune: <strong id="minSgVal">Any</strong></span>
+              <input type="range" id="minSgRange" min="0" max="4.7" step="0.1" value="0" />
+            </label>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+
+        <!-- 5. Authors (with AND / OR + Tap-Again Deselect) -->
+        <div class="filter-popover" data-filter-box="author">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Authors</span>
+              <span class="ft-value" id="badge-author">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel filter-panel-wide hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Authors</span>
+              <div class="logic-switch" data-logic-toggle="author" role="group" aria-label="Author match logic">
+                <button type="button" class="logic-btn" data-logic-val="AND" title="Co-authored by all selected">AND</button>
+                <button type="button" class="logic-btn active" data-logic-val="OR" title="Written by any selected author">OR</button>
+              </div>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <p class="helper-note" id="authorLogicHint">Tap an author to select, or tap again to deselect. <strong>OR</strong> shows books by any selected author.</p>
+            <div class="autocomplete-wrap">
+              <input type="text" id="authorSearchInput" placeholder="Search any author (e.g. Haruki Murakami)…" />
+              <div class="autocomplete-menu hidden" id="authorSuggestions"></div>
+            </div>
+            <div class="selected-tags" id="selectedAuthorTags"></div>
+            <div class="panel-section">
+              <span class="sub-label">Essential Authors</span>
+              <div class="pill-group" id="authorPresets"></div>
+            </div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+
+        <!-- 6. Themes & Moods (with AND / OR) -->
+        <div class="filter-popover" data-filter-box="theme">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L14.8 8.6L22 9.3L16.5 14L18.2 21L12 17.3L5.8 21L7.5 14L2 9.3L9.2 8.6L12 2Z"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Themes &amp; Mood</span>
+              <span class="ft-value" id="badge-theme">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel filter-panel-wide hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Themes &amp; Literary Moods</span>
+              <div class="logic-switch" data-logic-toggle="theme" role="group" aria-label="Theme match logic">
+                <button type="button" class="logic-btn active" data-logic-val="AND">AND</button>
+                <button type="button" class="logic-btn" data-logic-val="OR">OR</button>
+              </div>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <p class="helper-note" id="themeLogicHint">Finding books combining <strong>all</strong> selected themes.</p>
+            <div class="pill-group" id="themePills"></div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+
+        <!-- 7. Publishers & Imprints (with AND / OR + Tap-Again Deselect) -->
+        <div class="filter-popover" data-filter-box="publisher">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Publishers</span>
+              <span class="ft-value" id="badge-publisher">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel filter-panel-wide hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Publishers &amp; Imprints</span>
+              <div class="logic-switch" data-logic-toggle="publisher" role="group" aria-label="Publisher match logic">
+                <button type="button" class="logic-btn" data-logic-val="AND">AND</button>
+                <button type="button" class="logic-btn active" data-logic-val="OR">OR</button>
+              </div>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="publisherPresets"></div>
+            <div class="autocomplete-wrap">
+              <input type="text" id="publisherSearchInput" placeholder="Add publisher & press Enter (e.g. Knopf)…" />
+            </div>
+            <div class="selected-tags" id="selectedPublisherTags"></div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+
+        <!-- 8. Publication Era & Year -->
+        <div class="filter-popover" data-filter-box="era">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Era &amp; Year</span>
+              <span class="ft-value" id="badge-era">All Eras</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">First Published Era</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="eraPresets"></div>
+            <div class="year-range-row">
+              <input type="number" id="yearFromInput" placeholder="From (1850)" min="1400" max="2026" />
+              <span>–</span>
+              <input type="number" id="yearToInput" placeholder="To (2026)" min="1400" max="2026" />
+            </div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+
+        <!-- 9. Literary Awards -->
+        <div class="filter-popover" data-filter-box="awards">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9c-2 2-2 7 2 10M18 9c2 2 2 7-2 10"/><circle cx="12" cy="10" r="4"/><path d="M9 19h6"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Literary Prizes</span>
+              <span class="ft-value" id="badge-awards">All Books</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Prestigious Literary Honors</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="pill-group" id="awardsPills"></div>
+            <p class="helper-note">Verified prize pools with laurel badges on every honoree.</p>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+
+        <!-- 10. Page Count & Reading Access -->
+        <div class="filter-popover" data-filter-box="length">
+          <button type="button" class="filter-trigger" aria-expanded="false">
+            <span class="ft-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+            </span>
+            <span class="ft-labels">
+              <span class="ft-name">Length &amp; Access</span>
+              <span class="ft-value" id="badge-length">Any</span>
+            </span>
+            <span class="ft-chevron">▾</span>
+          </button>
+          <div class="filter-panel hidden">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-header">
+              <span class="panel-label">Page Length &amp; Editions</span>
+              <button type="button" class="sheet-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <label class="field-row">
+              <span>Max Page Count: <strong id="maxPagesVal">Any</strong></span>
+              <input type="range" id="maxPagesRange" min="150" max="900" step="50" value="900" />
+            </label>
+            <div class="panel-section">
+              <span class="sub-label">Edition Access</span>
+              <div class="pill-group" id="availabilityPills"></div>
+            </div>
+            <button type="button" class="btn-accent sheet-done-btn">Apply &amp; Show Books</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Filter Chips (Tap any chip to deselect immediately) -->
+      <div class="active-filters-strip hidden" id="activeFiltersStrip"></div>
+
+      <!-- Formal Sorter & Results Meta Bar -->
+      <div class="results-toolbar">
+        <div class="results-meta" id="resultsMeta">Literary archive ready.</div>
+
+        <div class="sorter-shell" aria-label="Sort Books">
+          <div class="sorter-quick-pills" id="sorterQuickPills">
+            <button type="button" class="sort-pill active" data-sort-val="popularity.desc">Popular</button>
+            <button type="button" class="sort-pill" data-sort-val="goodreads.desc">Goodreads ★</button>
+            <button type="button" class="sort-pill" data-sort-val="storygraph.desc">StoryGraph</button>
+            <button type="button" class="sort-pill" data-sort-val="year.desc">Newest</button>
+          </div>
+          <select id="sortSelect" aria-label="Full Sort Options">
+            <option value="popularity.desc">Sort: Most Read &amp; Popular</option>
+            <option value="goodreads.desc">Sort: Goodreads (High → Low · Rated Only)</option>
+            <option value="goodreads.asc">Sort: Goodreads (Low → High · Rated Only)</option>
+            <option value="storygraph.desc">Sort: StoryGraph (High → Low · Rated Only)</option>
+            <option value="storygraph.asc">Sort: StoryGraph (Low → High · Rated Only)</option>
+            <option value="year.desc">Sort: Publication Year (Newest)</option>
+            <option value="year.asc">Sort: Classic First (Oldest)</option>
+            <option value="pages.asc">Sort: Page Count (Shortest First)</option>
+            <option value="title.asc">Sort: Title (A → Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Discovery Grid -->
+      <div class="media-grid" id="discoverGrid"></div>
+
+      <div class="pagination-bar hidden" id="paginationBar">
+        <button class="btn-outline" id="loadMoreBtn">Load More Books</button>
+      </div>
+    </div>
+
+    <!-- ==================== VIEW: READING SHELF ==================== -->
+    <div id="shelfView" class="view-section">
+      <div class="section-header-bar">
+        <div>
+          <p class="eyebrow">PERSONAL LIBRARY</p>
+          <h1 class="editorial-heading" id="shelfHeading">Your Reading Shelf</h1>
+        </div>
+        <div class="studio-toolbar">
+          <div class="pill-group" id="shelfFilterPills">
+            <button class="chip active" data-shelf-filter="all">All Saved</button>
+            <button class="chip" data-shelf-filter="toread">To Read</button>
+            <button class="chip" data-shelf-filter="finished">Finished</button>
+          </div>
+          <button class="btn-outline btn-sm" id="exportShelfBtn">Export</button>
+          <label class="btn-outline btn-sm file-label">
+            Import
+            <input type="file" id="importShelfInput" accept="application/json" hidden />
+          </label>
+        </div>
+      </div>
+      <div class="media-grid" id="shelfGrid"></div>
+    </div>
+  </main>
+
+  <!-- ==================== MOBILE FLOATING BOTTOM DOCK ==================== -->
+  <nav class="mobile-dock" aria-label="Mobile Navigation">
+    <button type="button" class="dock-btn active" data-mobile-nav="home">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z"/></svg>
+      <span>Home</span>
+    </button>
+    <button type="button" class="dock-btn" data-mobile-nav="discover">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+      <span>Filters</span>
+    </button>
+    <button type="button" class="dock-btn" data-mobile-nav="search">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <span>Search</span>
+    </button>
+    <button type="button" class="dock-btn" data-mobile-nav="shelf">
+      <span class="dock-icon-wrap">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 4h12a1 1 0 0 1 1 1v16l-7-4-7 4V5a1 1 0 0 1 1-1z"/></svg>
+        <span class="dock-badge" id="mobileShelfBadge">0</span>
+      </span>
+      <span>Shelf</span>
+    </button>
+  </nav>
+
+  <!-- ==================== BOOK DOSSIER MODAL ==================== -->
+  <div class="modal-backdrop hidden" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="modal-dialog detail-dialog">
+      <button class="modal-close-btn" id="closeDetailModalBtn" aria-label="Close book details">&times;</button>
+      <div id="detailModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ==================== READING ROOM (EXCERPT & FIRST LINES) ==================== -->
+  <div class="modal-backdrop hidden" id="readerModal" role="dialog" aria-modal="true" aria-label="Reading Room">
+    <div class="modal-dialog reader-dialog">
+      <div class="reader-topbar">
+        <div>
+          <span class="eyebrow">READING ROOM</span>
+          <h3 id="readerTitleText">Opening Excerpt</h3>
+        </div>
+        <div class="reader-topbar-actions">
+          <a id="readerExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="btn-outline btn-sm">Open Library ↗</a>
+          <button class="modal-close-inline" id="closeReaderModalBtn" aria-label="Close reading room">&times;</button>
+        </div>
+      </div>
+      <div class="reader-stage" id="readerStage"></div>
+    </div>
+  </div>
+
+  <!-- ==================== SETTINGS DRAWER ==================== -->
+  <div class="drawer-backdrop hidden" id="settingsDrawer">
+    <aside class="settings-panel" aria-label="Studio Settings">
+      <div class="drawer-header">
+        <div>
+          <span class="eyebrow">PREFERENCES</span>
+          <h2>Studio Settings</h2>
+        </div>
+        <button class="modal-close-inline" id="closeSettingsBtn" aria-label="Close settings">&times;</button>
+      </div>
+
+      <div class="drawer-content">
+        <div class="settings-group">
+          <h3>Dark Surface</h3>
+          <div class="swatch-grid" id="themeSelectorGrid"></div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Formal Accent</h3>
+          <div class="accent-grid" id="accentSelectorGrid"></div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Data &amp; AI Enhancement</h3>
+          <p class="helper-note">Books load live from <strong>Open Library</strong> with no API key required. Add an optional Gemini key below for <strong>AI Discover</strong> and Search-grounded Goodreads &amp; Prize verification.</p>
+          <label class="field-row">
+            <span>Google Gemini API Key (Optional)</span>
+            <input type="password" id="geminiKeyInput" placeholder="Enter Gemini API Key…" autocomplete="off" />
+          </label>
+          <div class="settings-btn-row">
+            <button class="btn-accent btn-sm" id="saveApiKeysBtn">Save Settings</button>
+            <button class="btn-outline btn-sm" id="clearCacheBtn">Clear Cache</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ==================== MEMBER AUTH MODAL ==================== -->
+  <div class="modal-backdrop hidden" id="authModal" role="dialog" aria-modal="true" aria-label="Member Authentication">
+    <div class="modal-dialog auth-dialog">
+      <button class="modal-close-btn" id="closeAuthModalBtn" aria-label="Close">&times;</button>
+      <div class="auth-crest" aria-hidden="true">
+        <svg viewBox="0 0 64 32" width="52" height="26" fill="none">
+          <path d="M8 2 H56 L62 16 L56 30 H8 L2 16 Z" stroke="currentColor" stroke-width="1.2" />
+          <text x="32" y="20.5" text-anchor="middle" fill="currentColor" font-family="Playfair Display, Georgia, serif" font-size="11" font-weight="600" letter-spacing="2">W·R·T</text>
+        </svg>
+      </div>
+
+      <div class="auth-header">
+        <span class="eyebrow">MEMBER LIBRARY</span>
+        <h2 id="authModalTitle">Log In to Would Read That</h2>
+        <p class="helper-note">Passwords are salted &amp; SHA-256 hashed locally. Each reader keeps a private reading shelf.</p>
+      </div>
+
+      <div class="auth-tabs" id="authTabs">
+        <button type="button" class="auth-tab active" data-auth-mode="login">Log In</button>
+        <button type="button" class="auth-tab" data-auth-mode="signup">Sign Up</button>
+      </div>
+
+      <form id="authForm" class="form-stack">
+        <label class="field-row hidden" id="authDisplayNameRow">
+          <span>Display Name</span>
+          <input type="text" id="authDisplayName" placeholder="e.g. Mustafa" autocomplete="name" />
+        </label>
+        <label class="field-row">
+          <span>Username</span>
+          <input type="text" id="authUsername" required minlength="3" placeholder="e.g. bibliophile" autocomplete="username" />
+        </label>
+        <label class="field-row">
+          <span>Password</span>
+          <input type="password" id="authPassword" required minlength="4" placeholder="••••••••" autocomplete="current-password" />
+        </label>
+        <label class="field-row hidden" id="authConfirmRow">
+          <span>Confirm Password</span>
+          <input type="password" id="authConfirmPassword" placeholder="••••••••" autocomplete="new-password" />
+        </label>
+        <p class="auth-error hidden" id="authErrorText"></p>
+        <button type="submit" class="btn-accent" id="authSubmitBtn">Log In</button>
+      </form>
+
+      <div id="signedInPanel" class="hidden signed-in-panel">
+        <div>
+          <span class="eyebrow">ACTIVE READER</span>
+          <div class="signed-in-name" id="signedInUserLabel"></div>
+          <div class="helper-note" id="signedInStats"></div>
+        </div>
+        <button class="btn-outline btn-sm" id="logoutBtn">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast hidden" id="toastEl" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
