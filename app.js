@@ -29,7 +29,7 @@
 
   function createDefaultFilters() {
     return {
-      format: 'fiction',
+      format: 'all',
       genres: [],
       genreLogic: 'AND',
       minGoodreads: 0,
@@ -186,6 +186,7 @@
             ? items.map((item) => createCardHTML(item)).join('')
             : `<div class="empty-state" style="min-width:260px;">No editions found for ${escapeHtml(col.title)}.</div>`;
           attachCoverFallbacks(row);
+          hydrateMissingCovers(row, items);
         })
         .catch(() => {
           const row = $(`col-row-${col.id}`);
@@ -199,15 +200,16 @@
     const item = state.heroItems[state.heroIndex];
     const saved = isInShelf(item.id);
     const metaPayload = serializeShelfPayload(item);
+    const heroImgUrl = item.coverLargeUrl || item.posterUrl || '';
 
     $('heroTrack').innerHTML = `
       <div class="hero-slide hero-book-slide">
-        ${item.coverLargeUrl ? `<div class="hero-backdrop-blur" style="background-image:url('${item.coverLargeUrl}')"></div>` : ''}
+        ${heroImgUrl ? `<div class="hero-backdrop-blur" style="background-image:url('${heroImgUrl}')"></div>` : ''}
         <div class="hero-layout">
           <div class="hero-book-jacket-wrap">
             ${
-              item.coverLargeUrl
-                ? `<img class="hero-book-jacket" src="${item.coverLargeUrl}" alt="${escapeHtml(item.displayTitle)}" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-author="${escapeHtml(item.authorDisplay)}" />`
+              heroImgUrl
+                ? `<img class="hero-book-jacket" src="${heroImgUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" fetchpriority="high" decoding="async" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-author="${escapeHtml(item.authorDisplay)}" />`
                 : buildCoverPlaceholderHTML(item.displayTitle, item.authorDisplay, 'hero-book-jacket')
             }
           </div>
@@ -232,6 +234,15 @@
       </div>`;
 
     attachCoverFallbacks($('heroTrack'));
+
+    if (!heroImgUrl && item.wikiTitle && typeof API.hydrateWikiCover === 'function') {
+      const slideIdx = state.heroIndex;
+      API.hydrateWikiCover(item).then((url) => {
+        if (url && state.heroIndex === slideIdx && state.heroItems[slideIdx]?.id === item.id) {
+          renderHeroSlide();
+        }
+      });
+    }
 
     $('heroDots').innerHTML = state.heroItems
       .map((_, i) => `<button class="hero-dot ${i === state.heroIndex ? 'active' : ''}" data-hero-dot="${i}" aria-label="Slide ${i + 1}"></button>`)
@@ -350,7 +361,7 @@
 
   function syncFilterBadges() {
     const f = state.filters;
-    const fmtLabel = CFG.FORMATS[f.format]?.label || 'Fiction';
+    const fmtLabel = CFG.FORMATS[f.format]?.label || 'All Books';
     const langObj = CFG.LANGUAGES.find((l) => l.code === f.language);
     const langLabel = f.language ? (langObj?.name.slice(0, 3).toUpperCase() || f.language.toUpperCase()) : 'Any';
     $('badge-format').textContent = `${fmtLabel} · ${langLabel}`;
@@ -384,7 +395,7 @@
     if (f.availability.length) lenParts.push(`${f.availability.length} access`);
     $('badge-length').textContent = lenParts.length ? lenParts.join(' · ') : 'Any';
 
-    setPopoverActive('format', f.format !== 'fiction' || Boolean(f.language));
+    setPopoverActive('format', f.format !== 'all' || Boolean(f.language));
     setPopoverActive('genre', f.genres.length > 0);
     setPopoverActive('goodreads', f.minGoodreads > 0);
     setPopoverActive('storygraph', f.minStorygraph > 0);
@@ -405,6 +416,9 @@
   function renderActiveFilterStrip() {
     const f = state.filters;
     const chips = [];
+    if (f.format && f.format !== 'all') {
+      chips.push({ type: 'format', id: '', label: CFG.FORMATS[f.format]?.label || f.format });
+    }
     if (f.language) {
       const langName = CFG.LANGUAGES.find((l) => l.code === f.language)?.name || f.language.toUpperCase();
       chips.push({ type: 'language', id: '', label: `Lang: ${langName}` });
@@ -458,7 +472,6 @@
 
   function renderDiscoverGrid(items, append = false, metaPrefix = '') {
     const grid = $('discoverGrid');
-    const isRatingSort = ['goodreads.desc', 'goodreads.asc', 'storygraph.desc', 'storygraph.asc'].includes(state.filters.sort);
 
     if (!append) state.currentResults = items;
     else {
@@ -475,8 +488,7 @@
       (state.discoverMode === 'search' || state.discoverMode === 'ai') &&
       state.filters.sort === 'popularity.desc';
     const displayList = API.sortAndSanitize(state.currentResults, state.filters.sort, preserveOrder);
-    const ratedNote = isRatingSort ? ' · unrated books hidden' : '';
-    $('resultsMeta').textContent = `${metaPrefix}${displayList.length} book${displayList.length === 1 ? '' : 's'}${ratedNote}`;
+    $('resultsMeta').textContent = `${metaPrefix}${displayList.length} book${displayList.length === 1 ? '' : 's'}`;
 
     if (!displayList.length) {
       grid.innerHTML = `<div class="empty-state">No books match that exact combination. Try switching an <strong>AND</strong> filter to <strong>OR</strong>, or tap an active chip above to remove it.</div>`;
@@ -485,6 +497,7 @@
 
     grid.innerHTML = displayList.map((item) => createCardHTML(item)).join('');
     attachCoverFallbacks(grid);
+    hydrateMissingCovers(grid, displayList);
   }
 
   async function runDiscover(page = 1, append = false) {
@@ -582,7 +595,15 @@
   function attachCoverFallbacks(rootEl) {
     if (!rootEl) return;
     rootEl.querySelectorAll('img[data-fallback-title]').forEach((img) => {
+      if (img.dataset.fallbackBound === '1') {
+        if (img.complete && img.naturalWidth > 2 && img.naturalHeight > 2) img.classList.add('is-loaded');
+        return;
+      }
+      img.dataset.fallbackBound = '1';
+
+      let triedSecondary = false;
       let swapped = false;
+
       const swap = () => {
         if (swapped || !img.parentNode) return;
         swapped = true;
@@ -594,15 +615,56 @@
         ).trim();
         img.replaceWith(wrapper.firstElementChild);
       };
-      img.addEventListener('error', swap, { once: true });
-      img.addEventListener(
-        'load',
-        () => {
-          if (img.naturalWidth <= 2 || img.naturalHeight <= 2) swap();
-        },
-        { once: true }
-      );
-      if (img.complete && (img.naturalWidth <= 2 || img.naturalHeight <= 2)) swap();
+
+      const handleFailure = () => {
+        const secondary = img.dataset.fallbackSrc;
+        if (!triedSecondary && secondary && img.src !== secondary) {
+          triedSecondary = true;
+          img.src = secondary;
+          return;
+        }
+        swap();
+      };
+
+      const handleLoad = () => {
+        if (img.naturalWidth <= 2 || img.naturalHeight <= 2) {
+          handleFailure();
+        } else {
+          img.classList.add('is-loaded');
+        }
+      };
+
+      img.addEventListener('error', handleFailure);
+      img.addEventListener('load', handleLoad);
+      if (img.complete) handleLoad();
+    });
+  }
+
+  function hydrateMissingCovers(rootEl, items) {
+    if (!rootEl || !Array.isArray(items) || typeof API.hydrateWikiCover !== 'function') return;
+    const missing = items.filter((it) => !it.posterUrl && it.wikiTitle);
+    if (!missing.length) return;
+
+    missing.forEach((item) => {
+      API.hydrateWikiCover(item)
+        .then((url) => {
+          if (!url || !rootEl.isConnected) return;
+          const card = rootEl.querySelector(`.media-card[data-id="${CSS.escape(item.id)}"]`);
+          const placeholder = card?.querySelector('.poster-wrap .poster-placeholder');
+          if (!card || !placeholder) return;
+
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = item.displayTitle;
+          img.loading = 'lazy';
+          img.decoding = 'async';
+          img.dataset.fallbackSrc = item.fallbackPosterUrl || '';
+          img.dataset.fallbackTitle = item.displayTitle;
+          img.dataset.fallbackAuthor = item.authorDisplay || '';
+          placeholder.replaceWith(img);
+          attachCoverFallbacks(card);
+        })
+        .catch(() => {});
     });
   }
 
@@ -615,6 +677,7 @@
         displayYear: item.displayYear,
         pages: item.pages || null,
         posterUrl: item.posterUrl || '',
+        fallbackPosterUrl: item.fallbackPosterUrl || '',
         goodreadsScore: item.goodreadsScore,
         storygraphScore: item.storygraphScore,
         hasGoodreads: Boolean(item.hasGoodreads),
@@ -629,11 +692,11 @@
     const metaData = serializeShelfPayload(item);
 
     return `
-      <article class="media-card" data-action="open-detail" data-id="${escapeHtml(item.id)}">
+      <article class="media-card" data-action="open-detail" data-id="${escapeHtml(item.id)}" data-payload="${metaData}">
         <div class="poster-wrap">
           ${
             item.posterUrl
-              ? `<img src="${item.posterUrl}" alt="${escapeHtml(item.displayTitle)}" loading="lazy" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-author="${escapeHtml(item.authorDisplay)}" />`
+              ? `<img src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" loading="lazy" decoding="async" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-author="${escapeHtml(item.authorDisplay)}" />`
               : buildCoverPlaceholderHTML(item.displayTitle, item.authorDisplay)
           }
           ${item.awardBadge ? `<span class="card-laurel">${SVG_LAUREL} PRIZE</span>` : ''}
@@ -660,27 +723,28 @@
   }
 
   /* ---------- Book Dossier Modal & Reading Room ---------- */
-  async function openDetailModal(workId) {
+  async function openDetailModal(workId, fallbackPayload = null) {
     const modal = $('detailModal');
     const body = $('detailModalBody');
     modal.classList.remove('hidden');
     body.innerHTML = `<div class="empty-state" style="border:none;">Retrieving literary dossier…</div>`;
 
     try {
-      const d = await API.fetchBookDetails(workId);
+      const d = await API.fetchBookDetails(workId, fallbackPayload);
       const saved = isInShelf(d.id);
       const subjectsLine = (d.subjects || []).slice(0, 5).join(' · ');
       const publishersLine = (d.publishers || []).slice(0, 3).join(', ');
       const readingTime = d.pages ? `~${Math.max(1, Math.round(d.pages / 40))}h read` : '';
       const goodreadsSearch = `https://www.goodreads.com/search?q=${encodeURIComponent(`${d.displayTitle} ${d.authorDisplay}`)}`;
       const storygraphSearch = `https://app.thestorygraph.com/browse?search_term=${encodeURIComponent(`${d.displayTitle} ${d.authorDisplay}`)}`;
+      const detailCover = d.coverLargeUrl || d.posterUrl || '';
 
       body.innerHTML = `
-        <div class="detail-banner detail-book-banner" ${d.coverLargeUrl ? `style="background-image:url('${d.coverLargeUrl}')"` : ''}></div>
+        <div class="detail-banner detail-book-banner" ${detailCover ? `style="background-image:url('${detailCover}')"` : ''}></div>
         <div class="detail-content">
           ${
-            d.coverLargeUrl
-              ? `<img class="detail-poster" src="${d.coverLargeUrl}" alt="${escapeHtml(d.displayTitle)}" data-fallback-title="${escapeHtml(d.displayTitle)}" data-fallback-author="${escapeHtml(d.authorDisplay)}" />`
+            detailCover
+              ? `<img class="detail-poster" src="${detailCover}" data-fallback-src="${escapeHtml(d.fallbackPosterUrl || '')}" alt="${escapeHtml(d.displayTitle)}" decoding="async" data-fallback-title="${escapeHtml(d.displayTitle)}" data-fallback-author="${escapeHtml(d.authorDisplay)}" />`
               : buildCoverPlaceholderHTML(d.displayTitle, d.authorDisplay, 'detail-poster')
           }
           <div>
@@ -908,11 +972,11 @@
     grid.innerHTML = filtered
       .map(
         (item) => `
-      <article class="media-card" data-action="open-detail" data-id="${escapeHtml(item.id)}">
+      <article class="media-card" data-action="open-detail" data-id="${escapeHtml(item.id)}" data-payload="${serializeShelfPayload(item)}">
         <div class="poster-wrap">
           ${
             item.posterUrl
-              ? `<img src="${item.posterUrl}" alt="${escapeHtml(item.displayTitle)}" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-author="${escapeHtml(item.authorDisplay)}" />`
+              ? `<img src="${item.posterUrl}" data-fallback-src="${escapeHtml(item.fallbackPosterUrl || '')}" alt="${escapeHtml(item.displayTitle)}" loading="lazy" decoding="async" data-fallback-title="${escapeHtml(item.displayTitle)}" data-fallback-author="${escapeHtml(item.authorDisplay)}" />`
               : buildCoverPlaceholderHTML(item.displayTitle, item.authorDisplay)
           }
           <button type="button" class="card-wl-btn ${item.finished ? 'saved' : ''}" data-action="toggle-finished" data-id="${escapeHtml(item.id)}" title="Mark Finished / To Read">
@@ -1197,7 +1261,11 @@
         return;
       }
       if (action === 'open-detail') {
-        openDetailModal(target.dataset.id);
+        let fallback = null;
+        if (target.dataset.payload) {
+          try { fallback = JSON.parse(decodeURIComponent(target.dataset.payload)); } catch {}
+        }
+        openDetailModal(target.dataset.id, fallback);
       }
     });
 
@@ -1317,6 +1385,9 @@
 
       if (type === 'author' || type === 'publisher') {
         toggleEntityFilter(type, { id, name: '' });
+      } else if (type === 'format') {
+        state.filters.format = 'all';
+        $('formatPills').querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c.dataset.format === 'all'));
       } else if (type === 'genre') {
         state.filters.genres = state.filters.genres.filter((g) => g !== id);
         $('genrePills').querySelector(`[data-genre="${CSS.escape(id)}"]`)?.classList.remove('active');
@@ -1440,7 +1511,7 @@
       $('maxPagesRange').value = 900;
       $('maxPagesVal').textContent = 'Any';
       document.querySelectorAll('#filterBarShell .chip').forEach((c) => c.classList.remove('active'));
-      $('formatPills').querySelector('[data-format="fiction"]')?.classList.add('active');
+      $('formatPills').querySelector('[data-format="all"]')?.classList.add('active');
       $('grPresets').querySelector('[data-gr-preset="0"]')?.classList.add('active');
       $('sgPresets').querySelector('[data-sg-preset="0"]')?.classList.add('active');
       $('eraPresets').querySelector('[data-era="all"]')?.classList.add('active');

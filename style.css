@@ -1044,10 +1044,18 @@ input[type="range"] {
 .poster-wrap {
   position: relative;
   aspect-ratio: 2 / 3;
-  background: var(--bg-elevated);
+  background: linear-gradient(110deg, var(--bg-surface) 25%, var(--bg-elevated) 45%, var(--bg-surface) 65%);
+  background-size: 220% 100%;
   overflow: hidden;
 }
-.poster-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 420ms ease; }
+.poster-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 220ms ease, transform 420ms ease;
+}
+.poster-wrap img.is-loaded { opacity: 1; }
 .media-card:hover .poster-wrap img { transform: scale(1.03); }
 
 /* Cloth-bound typographic fallback jacket */
